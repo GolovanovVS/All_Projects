@@ -2,6 +2,7 @@
 #include <iostream>
 
 
-int main() {
-  return 0;
-}
+template<typename T>
+class Deque {
+
+};

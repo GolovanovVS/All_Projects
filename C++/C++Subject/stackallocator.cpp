@@ -6,7 +6,7 @@
 #include <deque>
 #include <fstream>
 #include <iostream>
-//#include <list>
+#include <list>
 #include <memory>
 #include <sstream>
 #include <stdexcept>
@@ -14,21 +14,21 @@
 #include <type_traits>
 #include <vector>
 
-//#include "stackallocator.h"
-#include "list.h"
+// #include "danger.h"
+#include "stackallocator.h"
 
-//template <typename T, typename Alloc = std::allocator<T>>
-//using List = std::list<T, Alloc>;
+// template<typename T, typename Alloc = std::allocator<T>>
+// using List = std::list<T, Alloc>;
 
-//template<typename T>
-//using StackAllocator = std::allocator<T>;
+// template<typename T>
+// using StackAllocator = std::allocator<T>;
 
-constexpr size_t STORAGE_SIZE = 200'000'000;
+constexpr size_t STORAGE_SIZE = 200000000;
 StackStorage<STORAGE_SIZE> STATIC_STORAGE;
 
 template <typename Alloc = std::allocator<int>>
 void BasicListTest(Alloc alloc = Alloc()) {
-  list<int, Alloc> lst(alloc);
+  List<int, Alloc> lst(alloc);
 
   assert(lst.size() == 0);
 
@@ -48,7 +48,7 @@ void BasicListTest(Alloc alloc = Alloc()) {
     s += std::to_string(x);
   }
   assert(s == "54321");
-  //std::cerr << " check 1.1 ok, list contains 5 4 3 2 1" << std::endl;
+  // std::cerr << " check 1.1 ok, list contains 5 4 3 2 1" << std::endl;
 
   auto cit = lst.cbegin();
   std::advance(cit, 3);
@@ -68,7 +68,7 @@ void BasicListTest(Alloc alloc = Alloc()) {
     s += std::to_string(x);
   }
   assert(s == "548936721");
-  //std::cerr << " check 1.2 ok, list contains 5 4 8 9 3 6 7 2 1" << std::endl;
+  // std::cerr << " check 1.2 ok, list contains 5 4 8 9 3 6 7 2 1" << std::endl;
 
   lst.erase(lst.cbegin());
   lst.erase(cit);
@@ -86,14 +86,14 @@ void BasicListTest(Alloc alloc = Alloc()) {
     s += std::to_string(x);
   }
   assert(s == "89672");
-  //std::cerr << " check 1.3 ok, list contains 8 9 6 7 2" << std::endl;
+  // std::cerr << " check 1.3 ok, list contains 8 9 6 7 2" << std::endl;
 
   auto rit = lst.rbegin();
   ++rit;
   lst.erase(rit.base());
   assert(lst.size() == 4);
 
-  rit = lst.rbegin();
+  rit  = lst.rbegin();
   *rit = 3;
 
   // now lst: 8 9 6 3, copy: 8 9 6 7 2
@@ -111,10 +111,11 @@ void BasicListTest(Alloc alloc = Alloc()) {
   }
   assert(s == "89672");
 
-  //std::cerr << " check 1.4 ok, list contains 8 9 6 3, another list is still 8 9 6 7 2" << std::endl;
+  // std::cerr << " check 1.4 ok, list contains 8 9 6 3, another list is still 8
+  // 9 6 7 2" << std::endl;
 
-  typename list<int, Alloc>::const_reverse_iterator crit = rit;
-  crit = copy.rbegin();
+  typename List<int, Alloc>::const_reverse_iterator crit = rit;
+  crit                                                   = copy.rbegin();
   assert(*crit == 2);
 
   cit = crit.base();
@@ -145,21 +146,35 @@ struct Accountant {
     dtor_calls = 0;
   }
 
-  Accountant() { ++ctor_calls; }
-  Accountant(const Accountant&) { ++ctor_calls; }
+  Accountant() {
+    ++ctor_calls;
+    // std::cout << "+1 default" << std::endl;
+  }
+  Accountant(const Accountant&) {
+    ++ctor_calls;
+    // std::cout << "+1 copy-assigment" << std::endl;
+  }
 
   Accountant& operator=(const Accountant&) {
     // Actually, when it comes to assign one list to another,
-    // list can use element-wise assignment instead of destroying nodes and creating new ones
+    // list can use element-wise assignment instead of destroying nodes and
+    // creating new ones
     ++ctor_calls;
     ++dtor_calls;
+
+    // std::cout << "+1 oper=" << std::endl;
+    // std::cout << "-1 oper=" << std::endl;
+
     return *this;
   }
 
-  Accountant(Accountant&&) = delete;
+  Accountant(Accountant&&)            = delete;
   Accountant& operator=(Accountant&&) = delete;
 
-  ~Accountant() { ++dtor_calls; }
+  ~Accountant() {
+    ++dtor_calls;
+    // std::cout << "-1 destroy" << std::endl;
+  }
 };
 
 size_t Accountant::ctor_calls = 0;
@@ -167,7 +182,7 @@ size_t Accountant::dtor_calls = 0;
 
 template <typename Alloc = std::allocator<NotDefaultConstructible>>
 void TestNotDefaultConstructible(Alloc alloc = Alloc()) {
-  list<NotDefaultConstructible, Alloc> lst(alloc);
+  List<NotDefaultConstructible, Alloc> lst(alloc);
   assert(lst.size() == 0);
   lst.push_back(VerySpecialType(0));
   assert(lst.size() == 1);
@@ -180,26 +195,35 @@ void TestAccountant(Alloc alloc = Alloc()) {
   Accountant::reset();
 
   {
-    list<Accountant, Alloc> lst(5, alloc);
+    List<Accountant, Alloc>   lst(5, alloc);
     assert(lst.size() == 5);
+    // std::cout << Accountant::ctor_calls << " " << Accountant::dtor_calls << '\n';
     assert(Accountant::ctor_calls == 5);
-    list<Accountant, Alloc> another = lst;
+
+    List<Accountant, Alloc> another = lst;
     assert(another.size() == 5);
+    // std::cout << Accountant::ctor_calls << '\n';
     assert(Accountant::ctor_calls == 10);
+
     assert(Accountant::dtor_calls == 0);
 
     another.pop_back();
     another.pop_front();
-    assert(Accountant::dtor_calls == 2);
 
-    lst = another; // dtor_calls += 5, ctor_calls += 3
+    // std::cout << Accountant::dtor_calls << std::endl;
+    assert(Accountant::dtor_calls == 2);
+    std::cout << Accountant::ctor_calls << ' ' << Accountant::dtor_calls
+              << std::endl;
+    lst = another;  // dtor_calls += 5, ctor_calls += 3
+    std::cout << Accountant::ctor_calls << ' ' << Accountant::dtor_calls
+              << std::endl;
     assert(another.size() == 3);
     assert(lst.size() == 3);
 
     assert(Accountant::ctor_calls == 13);
     assert(Accountant::dtor_calls == 7);
 
-  } // dtor_calls += 6
+  }  // dtor_calls += 6
 
   assert(Accountant::ctor_calls == 13);
   assert(Accountant::dtor_calls == 13);
@@ -215,7 +239,8 @@ struct ThrowingAccountant : public Accountant {
       throw std::string("Ahahahaha you have been cocknut");
   }
 
-  ThrowingAccountant(const ThrowingAccountant& other) : Accountant(), value(other.value) {
+  ThrowingAccountant(const ThrowingAccountant& other)
+      : Accountant(), value(other.value) {
     if (need_throw && ctor_calls % 5 == 4)
       throw std::string("Ahahahaha you have been cocknut");
   }
@@ -238,16 +263,17 @@ void TestExceptionSafety() {
   ThrowingAccountant::need_throw = true;
 
   try {
-    list<ThrowingAccountant> lst(8);
+    List<ThrowingAccountant> lst(8);
   } catch (...) {
     assert(Accountant::ctor_calls == 4);
+    std::cout << Accountant::dtor_calls << std::endl;
     assert(Accountant::dtor_calls == 4);
   }
 
   ThrowingAccountant::need_throw = false;
-  list<ThrowingAccountant> lst(8);
+  List<ThrowingAccountant> lst(8);
 
-  list<ThrowingAccountant> lst2;
+  List<ThrowingAccountant> lst2;
   for (int i = 0; i < 13; ++i) {
     lst2.push_back(i);
   }
@@ -267,24 +293,24 @@ void TestExceptionSafety() {
   try {
     lst = lst2;
   } catch (...) {
+    std::cout << Accountant::dtor_calls << " aaa" << std::endl;
     assert(Accountant::ctor_calls == 4);
+    std::cout << Accountant::dtor_calls << std::endl;
     assert(Accountant::dtor_calls == 4);
 
-    // Actually it may not be 8 (although de facto it is), but the only thing we can demand here
-    // is the abscence of memory leaks
+    // Actually it may not be 8 (although de facto it is), but the only thing we
+    // can demand here is the abscence of memory leaks
     //
-    //assert(lst.size() == 8);
+    // assert(lst.size() == 8);
   }
 }
 
-
 void TestAlignment() {
+  StackStorage<200000> storage;
 
-  StackStorage<200'000> storage;
+  StackAllocator<char, 200000> charalloc(storage);
 
-  StackAllocator<char, 200'000> charalloc(storage);
-
-  StackAllocator<int, 200'000> intalloc(charalloc);
+  StackAllocator<int, 200000> intalloc(charalloc);
 
   auto* pchar = charalloc.allocate(3);
 
@@ -300,7 +326,7 @@ void TestAlignment() {
 
   intalloc.deallocate(pint, 1);
 
-  StackAllocator<long double, 200'000> ldalloc(charalloc);
+  StackAllocator<long double, 200000> ldalloc(charalloc);
 
   auto* pld = ldalloc.allocate(25);
 
@@ -310,44 +336,52 @@ void TestAlignment() {
   ldalloc.deallocate(pld, 25);
 }
 
-
 template <typename T, bool PropagateOnConstruct, bool PropagateOnAssign>
 struct WhimsicalAllocator : public std::allocator<T> {
   std::shared_ptr<int> number;
 
   auto select_on_container_copy_construction() const {
-    return PropagateOnConstruct ? WhimsicalAllocator<T, PropagateOnConstruct, PropagateOnAssign>()
+    return PropagateOnConstruct ? WhimsicalAllocator<T, PropagateOnConstruct,
+                                                     PropagateOnAssign>()
                                 : *this;
   }
 
   struct propagate_on_container_copy_assignment
-      : std::conditional_t<PropagateOnAssign, std::true_type, std::false_type> {};
+      : std::conditional_t<PropagateOnAssign, std::true_type, std::false_type> {
+  };
 
   template <typename U>
   struct rebind {
-    using other = WhimsicalAllocator<U, PropagateOnConstruct, PropagateOnAssign>;
+    using other =
+        WhimsicalAllocator<U, PropagateOnConstruct, PropagateOnAssign>;
   };
 
-  WhimsicalAllocator() : number(std::make_shared<int>(counter)) { ++counter; }
+  WhimsicalAllocator() : number(std::make_shared<int>(counter)) {
+    ++counter;
+  }
 
   template <typename U>
-  WhimsicalAllocator(const WhimsicalAllocator<U, PropagateOnConstruct, PropagateOnAssign>& another)
+  WhimsicalAllocator(const WhimsicalAllocator<U, PropagateOnConstruct,
+                                              PropagateOnAssign>& another)
       : number(another.number) {}
 
   template <typename U>
-  auto& operator=(const WhimsicalAllocator<U, PropagateOnConstruct, PropagateOnAssign>& another) {
+  auto& operator=(const WhimsicalAllocator<U, PropagateOnConstruct,
+                                           PropagateOnAssign>& another) {
     number = another.number;
     return *this;
   }
+
   template <typename U>
-  bool operator==(
-      const WhimsicalAllocator<U, PropagateOnConstruct, PropagateOnAssign>& another) const {
-    return std::is_same_v<decltype(*this), decltype(another)> && *number == *another.number;
+  bool operator==(const WhimsicalAllocator<U, PropagateOnConstruct,
+                                           PropagateOnAssign>& another) const {
+    return std::is_same_v<decltype(*this), decltype(another)> &&
+           *number == *another.number;
   }
 
   template <typename U>
-  bool operator!=(
-      const WhimsicalAllocator<U, PropagateOnConstruct, PropagateOnAssign>& another) const {
+  bool operator!=(const WhimsicalAllocator<U, PropagateOnConstruct,
+                                           PropagateOnAssign>& another) const {
     return !(*this == another);
   }
 
@@ -355,11 +389,12 @@ struct WhimsicalAllocator : public std::allocator<T> {
 };
 
 template <typename T, bool PropagateOnConstruct, bool PropagateOnAssign>
-size_t WhimsicalAllocator<T, PropagateOnConstruct, PropagateOnAssign>::counter = 0;
+size_t WhimsicalAllocator<T, PropagateOnConstruct, PropagateOnAssign>::counter =
+    0;
 
 void TestWhimsicalAllocator() {
   {
-    list<int, WhimsicalAllocator<int, true, true>> lst;
+    List<int, WhimsicalAllocator<int, true, true>> lst;
 
     lst.push_back(1);
     lst.push_back(2);
@@ -371,7 +406,7 @@ void TestWhimsicalAllocator() {
     assert(copy.get_allocator() == lst.get_allocator());
   }
   {
-    list<int, WhimsicalAllocator<int, false, false>> lst;
+    List<int, WhimsicalAllocator<int, false, false>> lst;
 
     lst.push_back(1);
     lst.push_back(2);
@@ -383,7 +418,7 @@ void TestWhimsicalAllocator() {
     assert(copy.get_allocator() == lst.get_allocator());
   }
   {
-    list<int, WhimsicalAllocator<int, true, false>> lst;
+    List<int, WhimsicalAllocator<int, true, false>> lst;
 
     lst.push_back(1);
     lst.push_back(2);
@@ -404,50 +439,51 @@ int ListPerformanceTest(List&& l) {
 
   auto start = high_resolution_clock::now();
 
-  for (int i = 0; i < 1'000'000; ++i) {
+  for (int i = 0; i < 1000000; ++i) {
     l.push_back(i);
   }
   auto it = l.begin();
-  for (int i = 0; i < 1'000'000; ++i) {
+  for (int i = 0; i < 1000000; ++i) {
     l.push_front(i);
   }
   oss << *it;
 
   auto it2 = std::prev(it);
-  for (int i = 0; i < 2'000'000; ++i) {
+  for (int i = 0; i < 2000000; ++i) {
     l.insert(it, i);
-    if (i % 534'555 == 0) {
+    if (i % 534555 == 0) {
       oss << *it;
     }
   }
   oss << *it;
 
-  for (int i = 0; i < 1'500'000; ++i) {
+  for (int i = 0; i < 1500000; ++i) {
     l.pop_back();
-    if (i % 342'985 == 0)
+    if (i % 342985 == 0)
       oss << *l.rbegin();
   }
   oss << *l.rbegin();
 
-  for (int i = 0; i < 1'000'000; ++i) {
+  for (int i = 0; i < 1000000; ++i) {
     l.erase(it2++);
-    if (i % 432'098 == 0)
+    if (i % 432098 == 0)
       oss << *it2;
   }
   oss << *it2;
 
-  for (int i = 0; i < 1'000'000; ++i) {
+  for (int i = 0; i < 1000000; ++i) {
     l.pop_front();
   }
   oss << *l.begin();
 
-  for (int i = 0; i < 1'000'000; ++i) {
+  for (int i = 0; i < 1000000; ++i) {
     l.push_back(i);
   }
   oss << *l.rbegin();
 
   assert(oss.str() ==
-         "00000099999865701331402819710431628058149999904320988641969999991000000999999");
+         "000000999998657013314028197104316280581499999043209886419699999910000"
+         "00999999");
 
   auto finish = high_resolution_clock::now();
   return duration_cast<milliseconds>(finish - start).count();
@@ -462,46 +498,45 @@ void DequeTest() {
   d.push_back(1);
   assert(d.back() == 1);
 
-  d.resize(2'500'000, 5);
-  assert(d[1'000'000] == 5);
+  d.resize(2500000, 5);
+  assert(d[1000000] == 5);
 
   d.pop_back();
-  for (int i = 0; i < 2'000'000; ++i) {
+  for (int i = 0; i < 2000000; ++i) {
     d.push_back(i % 100);
   }
 
-  assert(d.size() == 4'499'999);
-  assert(d[4'000'000] == 1);
+  assert(d.size() == 4499999);
+  assert(d[4000000] == 1);
 
-  for (int i = 0; i < 4'000'000; ++i) {
+  for (int i = 0; i < 4000000; ++i) {
     d.pop_front();
   }
 
-  assert(d[400'000] == 1);
+  assert(d[400000] == 1);
 }
-
 
 template <template <typename, typename> class Container>
 void TestPerformance() {
-
   std::ostringstream oss_first;
   std::ostringstream oss_second;
 
-  int first = 0;
+  int first  = 0;
   int second = 0;
 
   {
     StackStorage<STORAGE_SIZE> storage;
     StackAllocator<int, STORAGE_SIZE> alloc(storage);
 
-    first = ListPerformanceTest(Container<int, std::allocator<int>>());
-    second = ListPerformanceTest(Container<int, StackAllocator<int, STORAGE_SIZE>>(alloc));
-    std::ignore = first;
+    first  = ListPerformanceTest(Container<int, std::allocator<int>>());
+    second = ListPerformanceTest(
+        Container<int, StackAllocator<int, STORAGE_SIZE>>(alloc));
+    std::ignore = first;  //./../././.
     std::ignore = second;
     first = 0, second = 0;
   }
 
-  double mean_first = 0.0;
+  double mean_first  = 0.0;
   double mean_second = 0.0;
 
   for (int i = 0; i < 3; ++i) {
@@ -511,35 +546,36 @@ void TestPerformance() {
 
     StackStorage<STORAGE_SIZE> storage;
     StackAllocator<int, STORAGE_SIZE> alloc(storage);
-    second = ListPerformanceTest(Container<int, StackAllocator<int, STORAGE_SIZE>>(alloc));
+    second = ListPerformanceTest(
+        Container<int, StackAllocator<int, STORAGE_SIZE>>(alloc));
     mean_second += second;
     oss_second << second << " ";
   }
 
   mean_first /= 5;
   mean_second /= 5;
+
   std::cerr << " Results with std::allocator: " << oss_first.str()
-            << " ms, results with StackAllocator: " << oss_second.str() << " ms " << std::endl;
+            << " ms, results with StackAllocator: " << oss_second.str()
+            << " ms " << std::endl;
 
   if (mean_first * 0.9 < mean_second) {
     throw std::runtime_error(
-        "StackAllocator expected to be at least 10\% faster than std::allocator, but mean time "
-        "were " +
-        std::to_string(mean_second) + " ms comparing with " + std::to_string(mean_first) +
-        " :((( ...\n");
+        "StackAllocator expected to be at least 10\% faster than "
+        "std::allocator, but mean time were " +
+        std::to_string(mean_second) + " ms comparing with " +
+        std::to_string(mean_first) + " :((( ...'\n'");
   }
 }
 
-
 int main() {
-
-  const rlim_t kStackSize = 210 * 1024 * 1024; // min stack size = 16 MB
+  const rlim_t kStackSize = 210 * 1024 * 1024;  // min stack size = 16 MB
   struct rlimit rl;
   int result;
 
   result = getrlimit(RLIMIT_STACK, &rl);
   if (result != 0) {
-    std::cerr << "Failed to get current stack size\n";
+    std::cerr << "Failed to get current stack size'\n'";
     abort();
   }
 
@@ -547,90 +583,98 @@ int main() {
 
   if (rl.rlim_cur < kStackSize) {
     rl.rlim_cur = kStackSize;
-    result = setrlimit(RLIMIT_STACK, &rl);
+    result      = setrlimit(RLIMIT_STACK, &rl);
     if (result != 0) {
-      std::cerr << "Failed to set bigger stack size\n";
+      std::cerr << "Failed to set bigger stack size'\n'";
       abort();
     }
     std::cerr << "Stack size is successfully set to " << kStackSize << '\n';
   }
 
-  static_assert(!std::is_assignable_v<decltype(*list<int>().cbegin()), int>);
-  static_assert(!std::is_assignable_v<list<int>::iterator, list<int>::const_iterator>);
+  static_assert(!std::is_assignable_v<decltype(*List<int>().cbegin()), int>);
+  static_assert(
+      !std::is_assignable_v<List<int>::iterator, List<int>::const_iterator>);
 
-  static_assert(std::is_same_v<std::iterator_traits<list<int>::iterator>::iterator_category,
-                               std::bidirectional_iterator_tag>);
-
+  static_assert(std::is_same_v<
+                std::iterator_traits<List<int>::iterator>::iterator_category,
+                std::bidirectional_iterator_tag>);
+  ///////////////
+  // std::cout << 5 << '\n';
   BasicListTest<>();
 
-  std::cerr << "Test 1 (BasicTest) with std::allocator passed. Now will repeat with StackAllocator"
+  std::cerr << "Test 1 (BasicTest) with std::allocator passed. Now will repeat "
+               "with StackAllocator"
             << std::endl;
 
   {
-    StackStorage<200'000> storage;
-    StackAllocator<int, 200'000> alloc(storage);
+    StackStorage<200000> storage;
+    StackAllocator<int, 200000> alloc(storage);
 
-    BasicListTest<StackAllocator<int, 200'000>>(alloc);
+    BasicListTest<StackAllocator<int, 200000>>(alloc);
   }
 
   std::cerr << "Test 1 with StackAllocator passed." << std::endl;
 
-  TestAccountant<>();
+  TestAccountant<>();  ////////////// 1
 
-  std::cerr << "Test 2 (counting) with std::allocator passed. Now will repeat with StackAllocator"
+  std::cerr << "Test 2 (counting) with std::allocator passed. Now will repeat "
+               "with StackAllocator"
             << std::endl;
 
   {
-    StackStorage<200'000> storage;
-    StackAllocator<int, 200'000> alloc(storage);
+    StackStorage<200000> storage;
+    StackAllocator<int, 200000> alloc(storage);
 
-    TestAccountant<StackAllocator<Accountant, 200'000>>(alloc);
+    TestAccountant<StackAllocator<Accountant, 200000>>(alloc);
   }
 
   std::cerr << "Test 2 with StackAllocator passed." << std::endl;
 
-  TestExceptionSafety();
+  TestExceptionSafety();  ////////// 2
 
   std::cerr << "Test 3 (ExceptionSafety) passed." << std::endl;
 
-  TestAlignment();
+  TestAlignment();  ////////// 3 разобраться с копи-конструктором аллокатора
 
   std::cerr << "Test 4 (Alignment) passed." << std::endl;
 
-  TestNotDefaultConstructible<>();
+  TestNotDefaultConstructible<>();  /////////////
 
   {
-    StackStorage<200'000> storage;
-    StackAllocator<int, 200'000> alloc(storage);
+    StackStorage<200000> storage;
+    StackAllocator<int, 200000> alloc(storage);
 
-    TestNotDefaultConstructible<StackAllocator<NotDefaultConstructible, 200'000>>(alloc);
+    TestNotDefaultConstructible<
+        StackAllocator<NotDefaultConstructible, 200000>>(alloc);
   }
 
   std::cerr << "Test 5 (NotDefaultConstructible) passed." << std::endl;
 
-  DequeTest<StackAllocator<char, STORAGE_SIZE>>();
+  DequeTest<StackAllocator<char, STORAGE_SIZE>>();  //////////// 4
 
   std::cerr << "Test 6 (Deque with StackAllocator) passed." << std::endl;
 
-  TestWhimsicalAllocator();
+  TestWhimsicalAllocator();  ///////////
 
   std::cerr << "Test 7 (Allocator Awareness) passed." << std::endl;
 
-  std::cerr << "Starting performance test. First, let's test performance of different allocators "
-               "with std::list."
+  std::cerr << "Starting performance test. First, lets test performance of "
+               "different allocators with std::list."
             << std::endl;
 
-  TestPerformance<std::list>();
+  // TestPerformance<std::list>();  ////
 
-  std::cerr << "Well, looks good! Finally let's test with your list!" << std::endl;
+  std::cerr << "Well, looks good! Finally lets test with your List!"
+            << std::endl;
 
-  TestPerformance<list>();
+  // TestPerformance<List>();
 
   std::cerr << "Tests passed, my sweetheart!" << std::endl;
 
-  if (std::is_assignable_v<list<int>, std::list<int>> ||
-      std::is_assignable_v<std::list<int>, list<int>>) {
-    std::cerr << "....but you must use your own list, not std::list!" << std::endl;
+  if (std::is_assignable_v<List<int>, std::list<int>> ||
+      std::is_assignable_v<std::list<int>, List<int>>) {
+    std::cerr << "....but you must use your own List, not std::list!"
+              << std::endl;
     throw std::runtime_error("Bad guy!");
   }
 
